@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<form>
+ID: <input id="txt1" type="text" name="name" value="1"><br>
+Rating: <input id="txt2" type="text" name="city" value="1"><br>
+Watermark: <input id="txt3" type="text" name="city" value="0"><br>
+<button type="button" onclick="doGetRatings()">GET RATINGS</button>
+<button type="button" onclick="doNewRating()">POST RATING</button>
+</form>
+
+
+<p id="output">HI</p>
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
+</script>
+
+<script>
+function doGetRatings() {
+    $.get('/get/ratings',
+		{ watermark: document.getElementById('txt3').value }, 
+		getRatingsDone, 
+		'json');
+}
+
+function getRatingsDone(data) {
+	console.log(data);
+	var str = 'Current watermark level: ' + data.NewWatermark + '<br>';
+	for ( var i = 0; i < data.Changes.length; i++ ) {
+		str += 'ID:' + data.Changes[i].ID + ' Rating:' + data.Changes[i].Rating + '<br>';
+	}
+	document.getElementById('output').innerHTML = str;
+}
+
+function doNewRating() {
+
+	$.post('/post/newrating',
+	{ id: document.getElementById('txt1').value,
+	  rating: document.getElementById('txt2').value},
+	newRatingDone, 
+	'json');
+
+}
+
+function newRatingDone(data) {
+	var str = 'New rating (' + data.rating +') added for ID: ' + data.id;
+	document.getElementById('output').innerHTML = str;
+}
+
+function doGet() { 
+    $.get('/post',
+  {
+	name:document.getElementById('txt1').value,
+	city:document.getElementById('txt2').value
+  }, function(d) { console.log(d);}, 'json');
+}
+function doPost() {
+
+	$.post('/post',
+	{
+		name:document.getElementById('txt1').value,
+		city:document.getElementById('txt2').value
+	}, function(d) {console.log(d);}, 'json');
+
+}
+</script>
+
+</body>
+</html>
