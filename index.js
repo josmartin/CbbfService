@@ -41,7 +41,7 @@ app.listen(3000);
 function onRequestUpdate( watermarkFrom ) {
 	var recent = _.filter(recentRatings, 
 		function(aRating) {
-			return aRating ? aRating.Watermark >= watermarkFrom : false; 
+			return aRating.Watermark >= watermarkFrom; 
 		});	 
 	updateCurrentWatermarkIfNeeded();
 	return { NewWatermark: currentWatermark, Changes: recent };
