@@ -6,8 +6,10 @@
 ID: <input id="txt1" type="text" name="name" value="1"><br>
 Rating: <input id="txt2" type="text" name="city" value="1"><br>
 Watermark: <input id="txt3" type="text" name="city" value="0"><br>
-<button type="button" onclick="doGetRatings()">GET RATINGS</button>
+<button type="button" onclick="doGetRatingsJournal()">GET JOURNAL</button>
+<button type="button" onclick="doGetAllRatings()">GET RATINGS</button>
 <button type="button" onclick="doNewRating()">POST RATING</button>
+<button type="button" onclick="doTestDatabase()">DATABASE</button>
 </form>
 
 
@@ -17,7 +19,7 @@ Watermark: <input id="txt3" type="text" name="city" value="0"><br>
 </script>
 
 <script>
-function doGetRatings() {
+function doGetRatingsJournal() {
     $.get('/get/ratings',
 		{ watermark: document.getElementById('txt3').value }, 
 		getRatingsDone, 
@@ -26,11 +28,37 @@ function doGetRatings() {
 
 function getRatingsDone(data) {
 	console.log(data);
-	var str = 'Current watermark level: ' + data.NewWatermark + '<br>';
-	for ( var i = 0; i < data.Changes.length; i++ ) {
-		str += 'ID:' + data.Changes[i].ID + ' Rating:' + data.Changes[i].Rating + '<br>';
+	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
+	for ( var i = 0; i < data.changes.length; i++ ) {
+		str += 'ID:' + data.changes[i].id + ' Rating:' + data.changes[i].rating + '<br>';
 	}
 	document.getElementById('output').innerHTML = str;
+}
+
+function doGetAllRatings() {
+	$.get('/get/allratings', 
+		{}, 
+		getAllRatingsDone,
+		'json');		
+}
+
+function getAllRatingsDone(data) {
+	console.log(data);
+	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
+	for ( var i = 0; i < data.ratings.length; i++ ) {
+		var r = data.ratings[i]
+		str += 'ID:' + r.id + ' Rating:' + r.r1 + ' ' + r.r2 + ' ' + r.r3 + ' ' + r.r4 + ' ' + r.r5 +'<br>';
+	}
+	document.getElementById('output').innerHTML = str;
+}
+
+function doTestDatabase() {
+
+	$.post('/post/testData',
+	{},
+	function(d) { console.log(d); }, 
+	'json');
+
 }
 
 function doNewRating() {
@@ -42,9 +70,9 @@ function doNewRating() {
 	'json');
 
 }
-
 function newRatingDone(data) {
-	var str = 'New rating (' + data.rating +') added for ID: ' + data.id;
+	var str = 'New rating (' + data.rating +') added for ID: ' + data.id + 
+		' at watermark: ' + data.watermark;
 	document.getElementById('output').innerHTML = str;
 }
 
