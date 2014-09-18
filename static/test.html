@@ -20,7 +20,7 @@ Watermark: <input id="txt3" type="text" name="city" value="0"><br>
 
 <script>
 function doGetRatingsJournal() {
-    $.get('/get/ratings',
+    $.get('/get/ratingjournal',
 		{ watermark: document.getElementById('txt3').value }, 
 		getRatingsDone, 
 		'json');
@@ -42,12 +42,14 @@ function doGetAllRatings() {
 		'json');		
 }
 
+function pad(a,b){ return ([1e15]+a).slice(-b); }
+
 function getAllRatingsDone(data) {
 	console.log(data);
 	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
 	for ( var i = 0; i < data.ratings.length; i++ ) {
 		var r = data.ratings[i]
-		str += 'ID:' + r.id + ' Rating:' + r.r1 + ' ' + r.r2 + ' ' + r.r3 + ' ' + r.r4 + ' ' + r.r5 +'<br>';
+		str += 'ID:' + pad(data.ids[i], 3) + '     Ratings:' + r + '<br>';
 	}
 	document.getElementById('output').innerHTML = str;
 }

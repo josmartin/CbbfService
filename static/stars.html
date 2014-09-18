@@ -1,0 +1,165 @@
+<!DOCTYPE html><html class=''>
+<head>
+<style>
+.rate_widget {
+    border:     1px solid #CCC;
+    overflow:   visible;
+    padding:    10px;
+    position:   relative;
+    width:      180px;
+    height:     32px;
+}
+.ratings_stars {
+	background: url('data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB3aWR0aD0iMjBweCIgaGVpZ2h0PSIyMHB4IiB2aWV3Qm94PSIwIDAgMjAgMjAiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDIwIDIwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48cG9seWdvbiBmaWxsPSIjREREREREIiBwb2ludHM9IjEwLDAgMTMuMDksNi41ODMgMjAsNy42MzkgMTUsMTIuNzY0IDE2LjE4LDIwIDEwLDE2LjU4MyAzLjgyLDIwIDUsMTIuNzY0IDAsNy42MzkgNi45MSw2LjU4MyAiLz48L3N2Zz4=') no-repeat;
+    float:      left;
+    height:     28px;
+    padding:    2px;
+    width:      32px;
+}
+.ratings_vote {
+	background: url('data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB3aWR0aD0iMjBweCIgaGVpZ2h0PSIyMHB4IiB2aWV3Qm94PSIwIDAgMjAgMjAiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDIwIDIwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48cG9seWdvbiBmaWxsPSIjZmYxMTExIiBwb2ludHM9IjEwLDAgMTMuMDksNi41ODMgMjAsNy42MzkgMTUsMTIuNzY0IDE2LjE4LDIwIDEwLDE2LjU4MyAzLjgyLDIwIDUsMTIuNzY0IDAsNy42MzkgNi45MSw2LjU4MyAiLz48L3N2Zz4=') no-repeat;
+}
+.ratings_over {
+	background: url('data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB3aWR0aD0iMjBweCIgaGVpZ2h0PSIyMHB4IiB2aWV3Qm94PSIwIDAgMjAgMjAiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDIwIDIwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48cG9seWdvbiBmaWxsPSIjRkZERjg4IiBwb2ludHM9IjEwLDAgMTMuMDksNi41ODMgMjAsNy42MzkgMTUsMTIuNzY0IDE2LjE4LDIwIDEwLDE2LjU4MyAzLjgyLDIwIDUsMTIuNzY0IDAsNy42MzkgNi45MSw2LjU4MyAiLz48L3N2Zz4=') no-repeat;
+}
+.total_votes {
+    background: #eaeaea;
+    top: 58px;
+    left: 0;
+    padding: 5px;
+    position:   absolute;  
+} 
+.beer_choice {
+    font: 10px verdana, sans-serif;
+    margin: 0 auto 40px auto;
+    width: 180px;
+}
+</style>
+</head>
+<body>
+<p id="watermark"></p>
+<script>
+/**
+ * This script block generates a table of 15 beer rating widgets
+ */
+document.write( '<table style="width:100%">' );
+var ROWS = 5, COLUMNS = 3, id = 1;
+for ( var r = 0; r < ROWS; r++ ) {
+	document.write( '<tr>' );
+	for ( var c = 0; c < COLUMNS; c++ ) {
+		document.write( '<td>' );
+		document.write( generateWidget(id++) );
+		document.write( '</td>' );
+	}
+	document.write( '</tr>' );
+}
+document.write( '</table>' );
+function generateWidget( id ) {
+	return ' \
+<div class="beer_choice">\
+    Rate: Beer ' + id + '\
+    <div id="' + id + '" class="rate_widget">\
+        <div id="1" class="ratings_stars"></div>\
+        <div id="2" class="ratings_stars"></div>\
+        <div id="3" class="ratings_stars"></div>\
+        <div id="4" class="ratings_stars"></div>\
+        <div id="5" class="ratings_stars"></div>\
+        <div class="total_votes">vote data</div>\
+    </div> \
+</div>';
+}
+/**
+ * END OF beer widget script block
+ */
+</script>
+<script src='//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js'></script>
+<script>
+var lastWatermark = 0;
+
+$('.ratings_stars').hover(
+    // Handles the mouseover
+    function() {
+        $(this).prevAll().andSelf().addClass('ratings_over');
+        $(this).nextAll().removeClass('ratings_vote'); 
+    },
+    // Handles the mouseout
+    function() {
+        $(this).prevAll().andSelf().removeClass('ratings_over');
+        set_votes($(this).parent());
+    }
+);
+
+$('.ratings_stars').bind('click', function() {
+    var widget = $(this).parent();
+	var rating = $(this).attr('id');
+	var beerID = $(widget).attr('id');
+	$.post('/post/newrating',
+		{ id: beerID,
+		  rating: rating },
+		function(data) { updateVotesFromJournal() }, 
+		'json');
+});
+
+init();
+
+function updateVotesFromJournal() {
+    $.get('/get/ratingjournal',
+		{ watermark: lastWatermark }, 
+		function (data) {
+			var widgetsToUpdate = [];
+			for ( var i = 0; i < data.changes.length; i++ ) {
+				var chg = data.changes[i];
+				var widgetStr = '#'+ chg.id + '.rate_widget';
+				$(widgetStr).data('fsr').votes[chg.rating-1] += 1;
+				widgetsToUpdate[widgetsToUpdate.length] = widgetStr;
+			}
+			for ( var i = 0; i <  widgetsToUpdate.length; i++ ) {
+				$(widgetsToUpdate[i]).each( function(i) {
+					set_votes(this);
+				});
+			}
+			setCurrentWatermark(data.newWatermark)
+		}, 'json');
+}
+
+function set_votes(widget) {
+	var votes = $(widget).data('fsr').votes;	
+    var nVotes = votes.reduce(function(a, b) { return a + b });
+	var sVotes = votes.reduce(function(a, b, i) { return a + b*(i+1) });
+    var exact = sVotes/nVotes;
+	var avg   = Math.round(exact);
+     
+    $(widget).find('#'+avg).prevAll().andSelf().addClass('ratings_vote');
+    $(widget).find('#'+avg).nextAll().removeClass('ratings_vote'); 
+    $(widget).find('.total_votes').text( nVotes + ' votes recorded (' + exact.toFixed(2) + ' rating)' );	
+}
+
+function doGetAllRatings(callback) {
+	$.get('/get/allratings', 
+		{}, 
+		callback,
+		'json');		
+}
+
+function setCurrentWatermark(watermark) {
+	lastWatermark = watermark;
+	document.getElementById('watermark').innerHTML = 'Current watermark: ' + watermark;
+}
+
+function init() {
+	doGetAllRatings( function(data) {		
+		$('.rate_widget').each(function(i) {
+			var widget = this;
+			INFO = {votes: data.ratings[i]}; 
+			$(widget).data( 'fsr', INFO );
+			set_votes(widget);
+		});
+		setCurrentWatermark(data.newWatermark);
+	});
+}
+
+function doRedraw() {
+	$('.rate_widget').each(function(i) { set_votes(this); });
+}
+
+</script>

@@ -17,14 +17,17 @@ app.use( bodyParser.urlencoded() );
 // the test server
 app.use('/static', express.static( __dirname + '/static' ));
 
-app.get( '/get/ratings', function( req, res ) {
+app.get( '/get/ratingjournal', function( req, res ) {
 		var watermarkFrom = req.query.watermark;
-		getRatingsFromWatermark(watermarkFrom, 
-			function(data) { res.send(data); });
+		getRatingsFromWatermark(watermarkFrom, function(output) { 
+			res.send(output); 
+		});
     });
 
 app.get( '/get/allratings', function( req, res ) {
-		getAllRatings( function(data) { res.send(data) });
+		getAllRatings( function(output) { 
+			res.send(output) 
+		});
 	});
 	
 app.post( '/post/newrating', function( req, res ) {
@@ -60,7 +63,7 @@ app.listen(3000);
  */
 var db = new sqlite3.Database(':memory:');
 var insertJournalQuery, selectJournalQuery, updateRatingQuery, selectRatingQuery;
-var nIDs = 200;
+var nIDs = 20;
 db.serialize(function() {
 	db.run('CREATE TABLE journal (id INTEGER, rating INTEGER)');
 	db.run('CREATE TABLE ratings (id INTEGER UNIQUE NOT NULL, r1, r2, r3, r4, r5)');
@@ -80,7 +83,7 @@ db.serialize(function() {
 /**
  * This is the business logic for dealing with storing ratings.
  */
-var lastWatermark;
+var lastWatermark = 0;
 function getRatingsFromWatermark( watermarkFrom, callback ) {
 -	selectJournalQuery.all( {$watermark: watermarkFrom}, 
 		function(err, rows) {
@@ -88,15 +91,24 @@ function getRatingsFromWatermark( watermarkFrom, callback ) {
 		});
 }
 
+
 function getAllRatings( callback ) {
 	selectRatingQuery.all( function( err, rows ) {
-			callback( {newWatermark: lastWatermark, ratings: rows} );
+			var ratings = new Array(rows.length);
+			var ids = new Array(rows.length);
+			for ( var i = 0; i < rows.length; i++ ) {
+				var t = rows[i];
+				ratings[i] = [t.r1, t.r2, t.r3, t.r4, t.r5];
+				ids[i] = t.id;
+			}
+			callback( {newWatermark: lastWatermark, ids: ids, ratings: ratings} );
 		});
 }
 
 function addRating( obj, callback ) {
 	var t = { 6: obj.id, 1:0, 2:0, 3:0, 4:0, 5:0 };
 	t[obj.rating] = 1;
+	
 	updateRatingQuery.run(t);
 	insertJournalQuery.run( {$id: obj.id, $rating: obj.rating}, 
 		function(data) {
