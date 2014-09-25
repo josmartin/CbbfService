@@ -3,13 +3,15 @@
 <body>
 
 <form>
-ID: <input id="txt1" type="text" name="name" value="1"><br>
-Rating: <input id="txt2" type="text" name="city" value="1"><br>
-Watermark: <input id="txt3" type="text" name="city" value="0"><br>
+User:		<input id="USER" 		type="text" value="1"><br>
+ID: 		<input id="ID" 			type="text" value="1"><br>
+Rating: 	<input id="RATE" 		type="text" value="1"><br>
+Watermark:	<input id="WATERMARK" 	type="text" value="0"><br>
 <button type="button" onclick="doGetRatingsJournal()">GET JOURNAL</button>
 <button type="button" onclick="doGetAllRatings()">GET RATINGS</button>
 <button type="button" onclick="doNewRating()">POST RATING</button>
-<button type="button" onclick="doTestDatabase()">DATABASE</button>
+<button type="button" onclick="doGetUserRatings()">USER RATINGS</button>
+<button type="button" onclick="doTest()">TEST</button>
 </form>
 
 
@@ -19,27 +21,51 @@ Watermark: <input id="txt3" type="text" name="city" value="0"><br>
 </script>
 
 <script>
+var beerURI = '';
+initServiceEndpoint();
+function initServiceEndpoint() {
+	$.get('/endpoints/beer.service', 
+		function(data) { beerURI = data; });		
+}
+
+
 function doGetRatingsJournal() {
-    $.get('/get/ratingjournal',
-		{ watermark: document.getElementById('txt3').value }, 
-		getRatingsDone, 
+    $.get(beerURI + '/get/ratings/journal',
+		{ watermark: $('#WATERMARK').val() }, 
+		getRatingsJournalDone, 
 		'json');
 }
 
-function getRatingsDone(data) {
+function getRatingsJournalDone(data) {
 	console.log(data);
 	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
 	for ( var i = 0; i < data.changes.length; i++ ) {
 		str += 'ID:' + data.changes[i].id + ' Rating:' + data.changes[i].rating + '<br>';
 	}
-	document.getElementById('output').innerHTML = str;
+	$('#output').html(str);
 }
 
 function doGetAllRatings() {
-	$.get('/get/allratings', 
+	$.get(beerURI + '/get/ratings/all', 
 		{}, 
 		getAllRatingsDone,
 		'json');		
+}
+
+function doGetUserRatings() {
+	$.get(beerURI + '/get/ratings/user', 
+		{ userID: $('#USER').val() }, 
+		getUserRatingsDone,
+		'json');		
+}
+
+function getUserRatingsDone(data) {
+	console.log(data);
+	var str = '';
+	for ( var i = 0; i < data.length; i++ ) {
+		str += 'ID:' + data[i].id + ' Rating:' + data[i].rating + '<br>';
+	}
+	$('#output').html(str);
 }
 
 function pad(a,b){ return ([1e15]+a).slice(-b); }
@@ -51,12 +77,12 @@ function getAllRatingsDone(data) {
 		var r = data.ratings[i]
 		str += 'ID:' + pad(data.ids[i], 3) + '     Ratings:' + r + '<br>';
 	}
-	document.getElementById('output').innerHTML = str;
+	$('#output').html(str);
 }
 
 function doTestDatabase() {
 
-	$.post('/post/testData',
+	$.post(beerURI + '/post/testData',
 	{},
 	function(d) { console.log(d); }, 
 	'json');
@@ -65,9 +91,10 @@ function doTestDatabase() {
 
 function doNewRating() {
 
-	$.post('/post/newrating',
-	{ id: document.getElementById('txt1').value,
-	  rating: document.getElementById('txt2').value},
+	$.post(beerURI + '/post/newrating',
+	{ 	user: $('#USER').val(),
+		id: $('#ID').val(),
+		rating: $('#RATE').val()},
 	newRatingDone, 
 	'json');
 
@@ -75,25 +102,9 @@ function doNewRating() {
 function newRatingDone(data) {
 	var str = 'New rating (' + data.rating +') added for ID: ' + data.id + 
 		' at watermark: ' + data.watermark;
-	document.getElementById('output').innerHTML = str;
+	$('#output').html(str);
 }
 
-function doGet() { 
-    $.get('/post',
-  {
-	name:document.getElementById('txt1').value,
-	city:document.getElementById('txt2').value
-  }, function(d) { console.log(d);}, 'json');
-}
-function doPost() {
-
-	$.post('/post',
-	{
-		name:document.getElementById('txt1').value,
-		city:document.getElementById('txt2').value
-	}, function(d) {console.log(d);}, 'json');
-
-}
 </script>
 
 </body>

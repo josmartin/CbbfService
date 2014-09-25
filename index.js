@@ -17,23 +17,38 @@ app.use( bodyParser.urlencoded() );
 // the test server
 app.use('/static', express.static( __dirname + '/static' ));
 
-app.get( '/get/ratingjournal', function( req, res ) {
+app.get( '/endpoints/beer.service', function( req, res ) {
+		res.send('');
+	});
+	
+app.get( '/get/ratings/journal', function( req, res ) {
 		var watermarkFrom = req.query.watermark;
 		getRatingsFromWatermark(watermarkFrom, function(output) { 
 			res.send(output); 
 		});
     });
 
-app.get( '/get/allratings', function( req, res ) {
+app.get( '/get/ratings/all', function( req, res ) {
 		getAllRatings( function(output) { 
 			res.send(output) 
 		});
 	});
+
+app.get( '/get/ratings/user', function( req, res ) {
+		var userID = req.query.userID;
+		getUserRatings( userID, function(output) { 
+			res.send(output) 
+		});
+	});
+	
 	
 app.post( '/post/newrating', function( req, res ) {
-		var rating = {id: req.body.id, rating: req.body.rating};
-		addRating(rating, function(watermark) {
-			res.send( { id:rating.id, rating:rating.rating, watermark:watermark });
+		var body = req.body;
+		if  (!( "id" in body && "rating" in body && "user" in body)) {
+			res.send({});
+		}
+		addRating(body, function(watermark) {
+			res.send( { id:body.id, rating:body.rating, watermark:watermark });
 		});
 	});
 
@@ -63,14 +78,19 @@ app.listen(3000);
  */
 var db = new sqlite3.Database(':memory:');
 var insertJournalQuery, selectJournalQuery, updateRatingQuery, selectRatingQuery;
+var	selectUserBeerRating, insertUserBeerRating, selectUserRatings;
 var nIDs = 20;
 db.serialize(function() {
 	db.run('CREATE TABLE journal (id INTEGER, rating INTEGER)');
 	db.run('CREATE TABLE ratings (id INTEGER UNIQUE NOT NULL, r1, r2, r3, r4, r5)');
+	db.run('CREATE TABLE user_rating (user INTEGER, id INTEGER, rating INTEGER, PRIMARY KEY (user, id) ON CONFLICT REPLACE)')
 	insertJournalQuery = db.prepare('INSERT INTO journal (id, rating) VALUES ($id, $rating)');
 	updateRatingQuery = db.prepare('UPDATE ratings SET r1=r1+?1, r2=r2+?2, r3=r3+?3, r4=r4+?4, r5=r5+?5 WHERE id=?6');
 	selectJournalQuery = db.prepare('SELECT id, rating FROM journal WHERE rowid >= $watermark');
 	selectRatingQuery = db.prepare('SELECT * from ratings');
+	selectUserBeerRating  = db.prepare('SELECT * from user_rating WHERE user = $user AND id = $id');
+	insertUserBeerRating  = db.prepare('REPLACE INTO user_rating (user, id, rating) VALUES ($user, $id, $rating)');
+	selectUserRatings = db.prepare('SELECT id, rating from user_rating WHERE user = $user');
 	
 	// Create ratings table
 	var stmt = db.prepare('INSERT INTO ratings VALUES (?, 0, 0, 0, 0, 0)');
@@ -91,6 +111,13 @@ function getRatingsFromWatermark( watermarkFrom, callback ) {
 		});
 }
 
+function getUserRatings( userID, callback ) { 
+	selectUserRatings.all( { $user: userID}, 
+		function(err, rows) {
+			callback( rows );
+		});
+}
+
 
 function getAllRatings( callback ) {
 	selectRatingQuery.all( function( err, rows ) {
@@ -106,15 +133,34 @@ function getAllRatings( callback ) {
 }
 
 function addRating( obj, callback ) {
-	var t = { 6: obj.id, 1:0, 2:0, 3:0, 4:0, 5:0 };
-	t[obj.rating] = 1;
-	
-	updateRatingQuery.run(t);
-	insertJournalQuery.run( {$id: obj.id, $rating: obj.rating}, 
-		function(data) {
-			lastWatermark = this.lastID+1;
-			callback(lastWatermark);
-		});	
+	var change = { 6: obj.id, 1:0, 2:0, 3:0, 4:0, 5:0 };
+	/*
+	 * Code structure is going to be:
+	 * Search user_ratings for old rating
+	 * If it exists we will need to remove it from 
+	 */
+	selectUserBeerRating.get({$user: obj.user, $id: obj.id}, function( err, row ) {
+		if ( row !== undefined ) {
+			if ( row.rating == obj.rating ) {
+				callback(lastWatermark);
+				return;
+			}
+			change[row.rating] += -1;
+		}
+		change[obj.rating] += 1;
+		insertUserBeerRating.run( {$user: obj.user, $id: obj.id, $rating: obj.rating} );
+		updateRatingQuery.run(change);
+		db.serialize(function() {
+			if ( row !== undefined ) {
+				insertJournalQuery.run( {$id: obj.id, $rating: -row.rating} );
+			}
+			insertJournalQuery.run( {$id: obj.id, $rating: obj.rating}, 
+				function(data) {
+					lastWatermark = this.lastID+1;
+					callback(lastWatermark);
+				});	
+		});
+	});
 }
 
 
