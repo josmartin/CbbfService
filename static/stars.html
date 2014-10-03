@@ -111,13 +111,14 @@ function updateVotesFromJournal() {
 		{ watermark: lastWatermark }, 
 		function (data) {
 			var widgetsToUpdate = [];
-			for ( var i = 0; i < data.changes.length; i++ ) {
-				var chg = data.changes[i];				
-				var widgetStr = '#'+ chg.id + '.rate_widget';
-				var index = Math.abs(chg.rating)-1;
-				var direction = chg.rating > 0 ? 1 : -1;
+			for ( var i = 0; i < data.journal.ids.length; i++ ) {
+                var id = data.journal.ids[i];
+                var rating = data.journal.ratings[i]
+				var widgetStr = '#'+ id + '.rate_widget';
+				var index = Math.abs(rating)-1;
+				var direction = rating > 0 ? 1 : -1;
 				$(widgetStr).data('fsr').votes[index] += direction;
-				widgetsToUpdate[widgetsToUpdate.length] = widgetStr;
+				widgetsToUpdate[id] = widgetStr;
 			}
 			for ( var i = 0; i <  widgetsToUpdate.length; i++ ) {
 				$(widgetsToUpdate[i]).each( function(i) {

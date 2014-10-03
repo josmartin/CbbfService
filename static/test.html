@@ -39,8 +39,8 @@ function doGetRatingsJournal() {
 function getRatingsJournalDone(data) {
 	console.log(data);
 	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
-	for ( var i = 0; i < data.changes.length; i++ ) {
-		str += 'ID:' + data.changes[i].id + ' Rating:' + data.changes[i].rating + '<br>';
+	for ( var i = 0; i < data.journal.ids.length; i++ ) {
+		str += 'ID:' + data.journal.ids[i] + ' Rating:' + data.journal.ratings[i] + '<br>';
 	}
 	$('#output').html(str);
 }
