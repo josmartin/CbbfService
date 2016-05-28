@@ -4,7 +4,7 @@
 
 <form>
 User:		<input id="USER" 		type="text" value="1"><br>
-ID: 		<input id="ID" 			type="text" value="1"><br>
+Beer: 		<input id="BEER"		type="text" value="1"><br>
 Rating: 	<input id="RATE" 		type="text" value="1"><br>
 Watermark:	<input id="WATERMARK" 	type="text" value="0"><br>
 <button type="button" onclick="doGetRatingsJournal()">GET JOURNAL</button>
@@ -39,8 +39,8 @@ function doGetRatingsJournal() {
 function getRatingsJournalDone(data) {
 	console.log(data);
 	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
-	for ( var i = 0; i < data.journal.ids.length; i++ ) {
-		str += 'ID:' + data.journal.ids[i] + ' Rating:' + data.journal.ratings[i] + '<br>';
+	for ( var i = 0; i < data.journal.beers.length; i++ ) {
+		str += 'ID:' + data.journal.beers[i] + ' Rating:' + data.journal.ratings[i] + '<br>';
 	}
 	$('#output').html(str);
 }
@@ -54,7 +54,7 @@ function doGetAllRatings() {
 
 function doGetUserRatings() {
 	$.get(beerURI + '/get/ratings/user', 
-		{ userID: $('#USER').val() }, 
+		{ user: $('#USER').val() }, 
 		getUserRatingsDone,
 		'json');		
 }
@@ -63,7 +63,7 @@ function getUserRatingsDone(data) {
 	console.log(data);
 	var str = '';
 	for ( var i = 0; i < data.length; i++ ) {
-		str += 'ID:' + data[i].id + ' Rating:' + data[i].rating + '<br>';
+		str += 'Beer:' + data[i].beer + ' Rating:' + data[i].rating + '<br>';
 	}
 	$('#output').html(str);
 }
@@ -75,7 +75,7 @@ function getAllRatingsDone(data) {
 	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
 	for ( var i = 0; i < data.ratings.length; i++ ) {
 		var r = data.ratings[i]
-		str += 'ID:' + pad(data.ids[i], 3) + '     Ratings:' + r + '<br>';
+		str += 'Beer:' + data.beers[i] + '   Name: ' + data.names[i] + '     Ratings:' + r + '<br>';
 	}
 	$('#output').html(str);
 }
@@ -93,14 +93,14 @@ function doNewRating() {
 
 	$.post(beerURI + '/post/newrating',
 	{ 	user: $('#USER').val(),
-		id: $('#ID').val(),
+		beer: $('#BEER').val(),
 		rating: $('#RATE').val()},
 	newRatingDone, 
 	'json');
 
 }
 function newRatingDone(data) {
-	var str = 'New rating (' + data.rating +') added for ID: ' + data.id + 
+	var str = 'New rating (' + data.rating +') added for Beer: ' + data.beer + 
 		' at watermark: ' + data.watermark;
 	$('#output').html(str);
 }
