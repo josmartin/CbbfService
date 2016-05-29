@@ -6,10 +6,12 @@ var sqlite3 = require('sqlite3').verbose();
 // Used to access the beer list from the current CBF website. We will ensure that
 // our list of available beers is up-to-date with this list.
 var cbf = require('./cbfAccess.js')
+var dbModule = require('./db.js')
+
 
 var app = express();
 app.use( bodyParser.json() );
-app.use( bodyParser.urlencoded() );
+app.use( bodyParser.urlencoded({extended: true}) );
 
 /**
  * Here we define all the web service routes and the overall behaviour
@@ -51,11 +53,11 @@ app.get( '/get/ratings/user', function( req, res ) {
     
 app.post( '/post/newrating', function( req, res ) {
         var body = req.body;
-        if  (!( "beer" in body && "rating" in body && "user" in body)) {
+        if  (!( "beerUUID" in body && "rating" in body && "user" in body)) {
             res.send({});
         }
         addRating(body, function(watermark) {
-            res.send( { beer:body.beer, rating:body.rating, watermark:watermark });
+            res.send( { beerUUID:body.beerUUID, rating:body.rating, watermark:watermark });
         });
     });
 
@@ -84,41 +86,42 @@ app.listen(3000);
  * Database creation
  */
 var db = new sqlite3.cached.Database('data/info.db');
-var insertJournalQuery, selectJournalQuery, updateRatingQuery, selectRatingQuery;
-var selectUserBeerRating, replaceUserBeerRating, selectUserRatings;
-var nIDs = 20;
+var selectJournalQuery, selectRatingQuery;
+var selectUserBeerRating, selectUserRatings;
 var cbfObject;
-
+var dbPool;
 db.serialize(function() {
-    db.run('CREATE TABLE IF NOT EXISTS journal (beer TEXT NOT NULL, rating INTEGER NOT NULL)');
-    db.run('CREATE TABLE IF NOT EXISTS ratings (beer TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beer) ON CONFLICT IGNORE)');
-    db.run('CREATE TABLE IF NOT EXISTS user_rating (user INTEGER NOT NULL, beer TEXT NOT NULL, rating INTEGER NOT NULL, PRIMARY KEY (user, beer) ON CONFLICT REPLACE)');
+    db.run('CREATE TABLE IF NOT EXISTS beers (beerUUID TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beerUUID) ON CONFLICT IGNORE)');
+    db.run('CREATE TABLE IF NOT EXISTS journal (beerID INTEGER NOT NULL, rating INTEGER NOT NULL, time NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid))');
+    db.run('CREATE TABLE IF NOT EXISTS user_rating (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid), PRIMARY KEY (user, beerID) ON CONFLICT REPLACE)', onDBCreated);
     
-    insertJournalQuery = db.prepare('INSERT INTO journal (beer, rating) VALUES ($beer, $rating)');
-    updateRatingQuery = db.prepare('UPDATE ratings SET r1=r1+?1, r2=r2+?2, r3=r3+?3, r4=r4+?4, r5=r5+?5 WHERE beer=?6');
-    selectJournalQuery = db.prepare('SELECT beer, rating FROM journal WHERE rowid >= $watermark');
-    selectRatingQuery = db.prepare('SELECT * from ratings');
-    selectUserBeerRating  = db.prepare('SELECT beer, rating from user_rating WHERE user = $user AND beer = $beer');
-    replaceUserBeerRating = db.prepare('REPLACE INTO user_rating (user, beer, rating) VALUES ($user, $beer, $rating)');
-    selectUserRatings = db.prepare('SELECT beer, rating from user_rating WHERE user = $user');
 });
+
+function onDBCreated(err) {
+    selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid >= $watermark');
+    selectRatingQuery = db.prepare('SELECT * from beers');
+    selectUserBeerRating  = db.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');
+    selectUserRatings = db.prepare('SELECT beerID, rating from user_rating WHERE user = $user');
+    
+    dbPool = dbModule.makeDBPool();
+}
 
 cbf.getBeerDataFromCBF( 
     (obj) => {
         cbfObject = obj;
-        console.log(obj);
+        console.log('Loaded beer data from CBF website');
         ensureAllBeersExistInRatingsTable( cbfObject.producers )
     }, 
     (error) => {
-        consol.log(`Got error from CBF Server: ${e.message}`);
+        consol.log(`Got error from CBF Server: ${error.message}`);
     });
 
     
 function ensureAllBeersExistInRatingsTable( producers ) {
-    var stmt = db.prepare('INSERT INTO ratings VALUES ($beer, $name, $brewery, 0, 0, 0, 0, 0)');
+    var stmt = db.prepare('INSERT INTO beers VALUES ($beerUUID, $name, $brewery, 0, 0, 0, 0, 0)');
     producers.forEach( (producer) =>  {
         producer.products.forEach( (product) => {
-            stmt.run( {$beer: product.id, $name: product.name, $brewery: producer.name} );
+            stmt.run( {$beerUUID: product.id, $name: product.name, $brewery: producer.name} );
         })
     });
 }
@@ -126,56 +129,43 @@ function ensureAllBeersExistInRatingsTable( producers ) {
 /**
  * This is the business logic for dealing with storing ratings.
  */
+// TODO - on startup get the correct watermark from the database
 var lastWatermark = 0;
 function getRatingsFromWatermark( watermarkFrom, callback ) {
 -   selectJournalQuery.all( {$watermark: watermarkFrom}, 
         function(err, rows) {
-            var data  = _convertDbOutputToArray(rows);
-            callback({newWatermark: lastWatermark, journal: data});
+            var ratings = new Array(rows.length);
+            var beerIDs = new Array(rows.length);
+            for ( var i = 0; i < rows.length; i++ ) {
+                var t = rows[i];
+                ratings[i] = t.rating;
+                beerIDs[i] = t.beerID;
+            }
+            callback({newWatermark: lastWatermark, journal: {beerIDs:beerIDs, ratings:ratings}});
         });
 }
 
 function getUserRatings( user, callback ) { 
-    selectUserRatings.all( { $user: user}, 
+    selectUserRatings.all( {$user: user}, 
         function(err, rows) {
             callback( rows );
         });
 }
 
-function _convertDbOutputToArray(rows) {
-    var ratings = new Array(rows.length);
-    var beers = new Array(rows.length);
-    for ( var i = 0; i < rows.length; i++ ) {
-        var t = rows[i];
-        ratings[i] = t.rating;
-        beers[i] = t.beer;
-    }
-    return {beers:beers, ratings:ratings};
-}
-
 function getAllRatings( callback ) {
     selectRatingQuery.all( function( err, rows ) {
             var ratings = new Array(rows.length);
-            var beers = new Array(rows.length);
+            var beerUUIDs = new Array(rows.length);
             var names = new Array(rows.length);
             for ( var i = 0; i < rows.length; i++ ) {
                 var t = rows[i];
                 ratings[i] = [t.r1, t.r2, t.r3, t.r4, t.r5];
-                beers[i] = t.beer;
+                beerUUIDs[i] = t.beerUUID;
                 names[i] = t.name;
             }
-            callback( {newWatermark: lastWatermark, beers: beers, ratings: ratings, names: names} );
+            callback( {newWatermark: lastWatermark, beerUUIDs: beerUUIDs, ratings: ratings, names: names} );
         });
 }
-
-function _beginTransaction(db) {
-    db.run('BEGIN TRANSACTION');
-}
-
-function _endTransaction(db) {
-    db.run('COMMIT TRANSACTION');
-}
-
 
 function addRating( obj, callback ) {
     /*
@@ -183,53 +173,69 @@ function addRating( obj, callback ) {
      * Search user_ratings for old rating
      * If it exists we will need to remove it from the existing 
      */
-    db.serialize(function() {
-    _beginTransaction(db);
-    selectUserBeerRating.get({$user: obj.user, $beer: obj.beer}, function( err, row ) {
-        // Return from select statement lets us know if this user and beer combination
-        // has been rated before. If it has, we need to undo the 
-        var change = { 6: obj.beer, 1:0, 2:0, 3:0, 4:0, 5:0 };
-        var journalChanges = [];
-        if ( row !== undefined ) {
-            // Giving the same rating again? Simply ignore since nothing needs to
-            // be done.
-            if ( row.rating == obj.rating ) {
-                callback(lastWatermark);
-                _endTransaction(db);
-                return;
-            }
-            // Otherwise, old rating needs to be removed from the journal
-            // and from the ratings count
-            change[row.rating] += -1;
-            journalChanges.push({$beer: obj.beer, $rating:-row.rating});
+    dbPool.acquire( function(err, client) {
+        if (err) { 
+            callback(err);
+            return
         }
-        // New rating needs to be added to the journal and the ratings count
-        change[obj.rating] += 1;
-        journalChanges.push({$beer: obj.beer, $rating:obj.rating});
-        // Replace user beer rating so we know this user has rated this beer
-        replaceUserBeerRating.run( {$user: obj.user, $beer: obj.beer, $rating: obj.rating} );
-        // Update the ratings counts
-        updateRatingQuery.run(change);
-        // Insert the changes into the journal 
-        var counter = 0;
-        journalChanges.forEach( function( journalChange ) {
-            // NOTE: This is still part of the db.serialize as forEach on an array
-            // stays within the same javascript execution block
-            insertJournalQuery.run( journalChange , function(data) {
-                counter++;
-                // Only trigger callback on last query execution
-                if ( counter == journalChanges.length ) {
-                    lastWatermark = this.lastID+1;
+        client.begin();
+        client.selectUserBeerRating.get({$user: obj.user, $beerUUID: obj.beerUUID}, function( err, row ) {
+            // Return from select statement lets us know if this user and beer combination
+            // has been rated before. If it has, we need to undo the 
+            var change = { 6: obj.beerUUID, 1:0, 2:0, 3:0, 4:0, 5:0 };
+            var journalChanges = [];
+            if ( row !== undefined ) {
+                // Giving the same rating again? Simply ignore since nothing needs to
+                // be done.
+                if ( row.rating == obj.rating ) {
                     callback(lastWatermark);
+                    client.rollback();
+                    dbPool.release(client);
+                    return;
                 }
-            });
+                // Otherwise, old rating needs to be removed from the journal
+                // and from the ratings count
+                change[row.rating] += -1;
+                journalChanges.push({$beerUUID: obj.beerUUID, $rating:-row.rating});
+            }
+            // New rating needs to be added to the journal and the ratings count
+            change[obj.rating] += 1;
+            journalChanges.push({$beerUUID: obj.beerUUID, $rating:obj.rating});
+            // Replace user beer rating so we know this user has rated this beer
+            client.replaceUserBeerRating.run( 
+                {$user: obj.user, $beerUUID: obj.beerUUID, $rating: obj.rating}, logDBError);
+            // Update the ratings counts
+            client.updateRatingQuery.run(change, logDBError);
+            // Insert the changes into the journal 
+            var counter = journalChanges.length;
+            for ( let journalChange of journalChanges ) {
+                // NOTE: This is still part of the db.serialize as forEach on an array
+                // stays within the same javascript execution block. 
+                // ALSO NOTE: It is critical that the callback below be defined as a
+                // function rather than => since the latter will bind in the this 
+                // object so it doesn't get a lastID as a result of calling the 
+                // insertJournal query.
+                client.insertJournalQuery.run( journalChange , function(err) {
+                    logDBError(err)
+                    counter--;
+                    // Only trigger callback on last query execution
+                    if ( counter === 0 ) {
+                        lastWatermark = this.lastID+1;
+                        client.commit();
+                        dbPool.release(client);
+                        callback(lastWatermark);
+                    }
+                });
+            }
         });
-        _endTransaction(db);
-    });
-    }); // db.serialize();
+    }); 
 }
 
-
+function logDBError(err) {
+    if (err) {
+        console.log(err);
+    }
+}
 
 function testDatabase() {
     db.serialize(function() {     

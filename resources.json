@@ -1,3 +1,5 @@
 {
-    "cbfJSONurl":"http://www.cambridgebeerfestival.com/cbf/43/beer/json"
+    "cbfJSONurlREAL":"http://www.cambridgebeerfestival.com/cbf/43/beer/json"
+    ,"cbfJSONurl":"http://services.bedewell.com/endpoints/cbf43.json"
+    ,"db_location":"data/info.db"
 }

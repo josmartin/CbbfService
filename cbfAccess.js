@@ -1,7 +1,6 @@
+"use strict";
 module.exports = {
-    getBeerDataFromCBF: function( onBeerDataReceived, onError ) {
-        getBeerDataFromCBF_impl( onBeerDataReceived, onError );
-    }
+    getBeerDataFromCBF: getBeerDataFromCBF
 }
 
 var http = require('http');
@@ -10,7 +9,7 @@ var resources = require('./resources.json');
 /**
 * This function queries the 
 */
-function getBeerDataFromCBF_impl( onBeerDataReceived, onError ) {
+function getBeerDataFromCBF( onBeerDataReceived, onError ) {
     http.get(resources.cbfJSONurl, (response) => {
         var str = '';
 

@@ -38,10 +38,12 @@ function doGetRatingsJournal() {
 
 function getRatingsJournalDone(data) {
 	console.log(data);
-	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
-	for ( var i = 0; i < data.journal.beers.length; i++ ) {
-		str += 'ID:' + data.journal.beers[i] + ' Rating:' + data.journal.ratings[i] + '<br>';
+	var str = 'Current watermark level: ' + data.newWatermark + '<br><br><br>';
+    str += '<table border="1"><tr><th>BeerUUID</th><th>Ratings</th></tr>';
+	for ( var i = 0; i < data.journal.beerIDs.length; i++ ) {
+		str += '<tr><td>' + data.journal.beerIDs[i] + '</td><td>'+ data.journal.ratings[i] + '</tr></td>';
 	}
+    str += '</table>';
 	$('#output').html(str);
 }
 
@@ -63,7 +65,7 @@ function getUserRatingsDone(data) {
 	console.log(data);
 	var str = '';
 	for ( var i = 0; i < data.length; i++ ) {
-		str += 'Beer:' + data[i].beer + ' Rating:' + data[i].rating + '<br>';
+		str += 'Beer:' + data[i].beerID + ' Rating:' + data[i].rating + '<br>';
 	}
 	$('#output').html(str);
 }
@@ -72,11 +74,12 @@ function pad(a,b){ return ([1e15]+a).slice(-b); }
 
 function getAllRatingsDone(data) {
 	console.log(data);
-	var str = 'Current watermark level: ' + data.newWatermark + '<br>';
+	var str = 'Current watermark level: ' + data.newWatermark + '<br><br><br>';
+    str += '<table border="1"><tr><th>BeerUUID</th><th>Name</th><th>Ratings</th></tr>';
 	for ( var i = 0; i < data.ratings.length; i++ ) {
-		var r = data.ratings[i]
-		str += 'Beer:' + data.beers[i] + '   Name: ' + data.names[i] + '     Ratings:' + r + '<br>';
+		str += '<tr><td>' + data.beerUUIDs[i] + '</td><td>' + data.names[i] + '</td><td>' + data.ratings[i] + '</td></tr>';
 	}
+    str += '</table>';
 	$('#output').html(str);
 }
 
@@ -92,15 +95,15 @@ function doTestDatabase() {
 function doNewRating() {
 
 	$.post(beerURI + '/post/newrating',
-	{ 	user: $('#USER').val(),
-		beer: $('#BEER').val(),
-		rating: $('#RATE').val()},
+	{ 	user:       $('#USER').val(),
+		beerUUID:   $('#BEER').val(),
+		rating:     $('#RATE').val()},
 	newRatingDone, 
 	'json');
 
 }
 function newRatingDone(data) {
-	var str = 'New rating (' + data.rating +') added for Beer: ' + data.beer + 
+	var str = 'New rating (' + data.rating +') added for Beer: ' + data.beerUUID + 
 		' at watermark: ' + data.watermark;
 	$('#output').html(str);
 }
