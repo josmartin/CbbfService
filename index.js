@@ -79,8 +79,6 @@ app.post( '/post*', function( req, res ) {
         res.send(req.body);
     });
 
-// Interact with this application on port 3000
-app.listen(3000);
 
 /**
  * Database creation
@@ -109,6 +107,8 @@ function onDBCreated(err) {
         if (!err) {
             lastWatermark = row.lastWatermark;
         }
+        // Interact with this application on port 3000
+        app.listen(3000);
     });
 }
 
@@ -192,8 +192,8 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
     retries = retries || 5;
     if (retries < 5) console.log('Retries = ' + retries);
     client.begin().then( (noerror) => {
-        // We managed to get a successful lock on the database to update 
-        // the ratings
+        // We managed to get a successful lock on the database to update the 
+        // ratings so start looking for an existing rating for this user and beer
         client.selectUserBeerRating.get({$user: obj.user, $beerUUID: obj.beerUUID}, function( err, row ) {
             // Return from select statement lets us know if this user and beer combination
             // has been rated before. If it has, we need to undo the 
@@ -203,9 +203,8 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
                 // Giving the same rating again? Simply ignore since nothing needs to
                 // be done.
                 if ( row.rating == obj.rating ) {
+                    client.rollback().then( (err) => {dbPool.release(client)} ); 
                     callback(lastWatermark);
-                    client.rollback();
-                    dbPool.release(client);
                     return;
                 }
                 // Otherwise, old rating needs to be removed from the journal
@@ -233,13 +232,12 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
                 // object so it doesn't get a lastID as a result of calling the 
                 // insertJournal query.
                 client.insertJournalQuery.run( journalChange , function(err) {
-                    logDBError(err, ' INSERT RUN CALLBACK with ' + obj.beerUUID + ' and object ' + JSON.stringify(obj)) 
+                    logDBError(err, ' journalChange') 
                     counter--;
                     // Only trigger callback on last query execution
                     if ( counter === 0 ) {
                         lastWatermark = this.lastID;
-                        client.commit();
-                        dbPool.release(client);
+                        client.commit().then( (err) => {dbPool.release(client)} );
                         callback(lastWatermark);
                     }
                 });
@@ -252,7 +250,7 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
             callback(null);
         } else {
             console.log('AGAIN');
-            setImmediate(addRatingOnPooledConnection, client, obj, callback, retries-1);
+            setTimeout(addRatingOnPooledConnection, 100, client, obj, callback, retries-1);
         }
     });
 }

@@ -53,10 +53,10 @@ class dbConnection {
         return new Promise( function( resolve, reject ) {
             self.beginStatement.run( (err) => {
                 if (err) { 
-                    console.log('BEGIN ' + err);
+                    console.log('BEGIN ERROR ' + err);
                     reject(err);
                 } else {
-                    resolve(err);
+                    resolve(self);
                 }
             });
             self.InUse = true;
@@ -64,12 +64,32 @@ class dbConnection {
     }
     
     commit() {
-    this.commitStatement.run((err) => {if (err) console.log('COMMIT ' + err)});
-        this.InUse = false;
+        var self = this;
+        return new Promise( function( resolve, reject ) {
+            self.commitStatement.run( (err) => {
+                self.InUse = false;
+                if (err) { 
+                    console.log('COMMIT ERROR ' + err);
+                    reject(err);
+                } else {
+                    resolve(resolve);
+                }
+            });
+        });
     }
     
     rollback() {
-        this.rollbackStatement.run((err) => {if (err) console.log('ROLLBACK ' + err)});
-        this.InUse = false;
+        var self = this;
+        return new Promise( function( resolve, reject ) {
+            self.rollbackStatement.run( (err) => {
+                self.InUse = false;
+                if (err) { 
+                    console.log('ROLLBACK ERROR ' + err);
+                    reject(err);
+                } else {
+                    resolve(self);
+                }
+            });
+        });
     }
 }

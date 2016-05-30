@@ -89,9 +89,9 @@ function doManyNewRatings() {
 }
 
 function doNewRatings(data) {
-    var nBeers = data.beerUUIDs.length-1;
+    var nBeers = data.beerUUIDs.length;
     for ( let i = 0; i < $('#NUMBER').val(); i++ ) {
-        let beerID = getRandomIntInclusive(1, nBeers);
+        let beerID = getRandomIntInclusive(0, nBeers-1);
         let rating = getRandomIntInclusive(1, 5);
         let user   = getRandomIntInclusive(1, 30);
         $.post(beerURI + '/post/newrating',
