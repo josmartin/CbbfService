@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<form>
+Number: 	<input id="NUMBER" 		type="text" value="1"><br>
+Watermark:	<input id="WATERMARK" 	type="text" value="0"><br>
+<button type="button" onclick="doGetRatingsJournal()">GET JOURNAL</button>
+<button type="button" onclick="doGetAllRatings()">GET RATINGS</button>
+<button type="button" onclick="doManyNewRatings()">POST N RATING</button>
+</form>
+
+
+<p id="output">HI</p>
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js">
+</script>
+
+<script>
+var beerURI = '';
+initServiceEndpoint();
+function initServiceEndpoint() {
+	$.get('/endpoints/beer.service', 
+		function(data) { beerURI = data; });		
+}
+
+
+function doGetRatingsJournal() {
+    $.get(beerURI + '/get/ratings/journal',
+		{ watermark: $('#WATERMARK').val() }, 
+		getRatingsJournalDone, 
+		'json');
+}
+
+function getRatingsJournalDone(data) {
+	var str = 'Current watermark level: ' + data.newWatermark + '<br><br><br>';
+    str += '<table border="1"><tr><th>BeerUUID</th><th>Ratings</th></tr>';
+	for ( var i = 0; i < data.journal.beerIDs.length; i++ ) {
+		str += '<tr><td>' + data.journal.beerIDs[i] + '</td><td>'+ data.journal.ratings[i] + '</tr></td>';
+	}
+    str += '</table>';
+	$('#output').html(str);
+}
+
+function doGetAllRatings() {
+    doGetAllRatings_impl(getAllRatingsDone);
+}
+
+function doGetAllRatings_impl(callback) {
+	$.get(beerURI + '/get/ratings/all', 
+		{}, 
+		callback,
+		'json');		
+}
+
+function getAllRatingsDone(data) {
+	console.log(data);
+	var str = 'Current watermark level: ' + data.newWatermark + '<br><br><br>';
+    str += '<table border="1"><tr><th>BeerUUID</th><th>Name</th><th>Ratings</th></tr>';
+	for ( var i = 0; i < data.ratings.length; i++ ) {
+		str += '<tr><td>' + data.beerUUIDs[i] + '</td><td>' + data.names[i] + '</td><td>' + data.ratings[i] + '</td></tr>';
+	}
+    str += '</table>';
+	$('#output').html(str);
+}
+
+function doGetUserRatings() {
+	$.get(beerURI + '/get/ratings/user', 
+		{ user: $('#USER').val() }, 
+		getUserRatingsDone,
+		'json');		
+}
+
+function getUserRatingsDone(data) {
+	var str = '';
+	for ( var i = 0; i < data.length; i++ ) {
+		str += 'Beer:' + data[i].beerID + ' Rating:' + data[i].rating + '<br>';
+	}
+	$('#output').html(str);
+}
+
+function getRandomIntInclusive(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function doManyNewRatings() {
+    $('#output').html('');
+    doGetAllRatings_impl(doNewRatings);
+}
+
+function doNewRatings(data) {
+    var nBeers = data.beerUUIDs.length-1;
+    for ( let i = 0; i < $('#NUMBER').val(); i++ ) {
+        let beerID = getRandomIntInclusive(1, nBeers);
+        let rating = getRandomIntInclusive(1, 5);
+        let user   = getRandomIntInclusive(1, 30);
+        $.post(beerURI + '/post/newrating',
+        { 	user:       user,
+            beerUUID:   data.beerUUIDs[beerID],
+            rating:     rating},
+        newRatingsDone, 
+        'json');
+    }
+}
+function newRatingsDone(data) {
+	var str = 'New rating (' + data.rating +') added for Beer: ' + data.beerUUID + 
+		' at watermark: ' + data.watermark + '<br>';
+	$('#output').append(str);
+}
+
+</script>
+
+</body>
+</html>

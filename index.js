@@ -56,7 +56,7 @@ app.post( '/post/newrating', function( req, res ) {
         if  (!( "beerUUID" in body && "rating" in body && "user" in body)) {
             res.send({});
         }
-        addRating(body, function(watermark) {
+        addRating(body, function(watermark) {            
             res.send( { beerUUID:body.beerUUID, rating:body.rating, watermark:watermark });
         });
     });
@@ -98,12 +98,18 @@ db.serialize(function() {
 });
 
 function onDBCreated(err) {
-    selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid >= $watermark');
+    selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid > $watermark');
     selectRatingQuery = db.prepare('SELECT * from beers');
     selectUserBeerRating  = db.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');
     selectUserRatings = db.prepare('SELECT beerID, rating from user_rating WHERE user = $user');
     
     dbPool = dbModule.makeDBPool();
+    
+    db.get('SELECT max(rowid) as lastWatermark FROM journal', function(err, row) {
+        if (!err) {
+            lastWatermark = row.lastWatermark;
+        }
+    });
 }
 
 cbf.getBeerDataFromCBF( 
@@ -129,7 +135,7 @@ function ensureAllBeersExistInRatingsTable( producers ) {
 /**
  * This is the business logic for dealing with storing ratings.
  */
-// TODO - on startup get the correct watermark from the database
+
 var lastWatermark = 0;
 function getRatingsFromWatermark( watermarkFrom, callback ) {
 -   selectJournalQuery.all( {$watermark: watermarkFrom}, 
@@ -176,9 +182,18 @@ function addRating( obj, callback ) {
     dbPool.acquire( function(err, client) {
         if (err) { 
             callback(err);
-            return
+        } else {
+            addRatingOnPooledConnection(client, obj, callback);
         }
-        client.begin();
+    }); 
+}
+
+function addRatingOnPooledConnection(client, obj, callback, retries) {
+    retries = retries || 5;
+    if (retries < 5) console.log('Retries = ' + retries);
+    client.begin().then( (noerror) => {
+        // We managed to get a successful lock on the database to update 
+        // the ratings
         client.selectUserBeerRating.get({$user: obj.user, $beerUUID: obj.beerUUID}, function( err, row ) {
             // Return from select statement lets us know if this user and beer combination
             // has been rated before. If it has, we need to undo the 
@@ -203,9 +218,11 @@ function addRating( obj, callback ) {
             journalChanges.push({$beerUUID: obj.beerUUID, $rating:obj.rating});
             // Replace user beer rating so we know this user has rated this beer
             client.replaceUserBeerRating.run( 
-                {$user: obj.user, $beerUUID: obj.beerUUID, $rating: obj.rating}, logDBError);
+                {$user: obj.user, $beerUUID: obj.beerUUID, $rating: obj.rating}, 
+                function(err) {logDBError(err, '  replaceUserBeerRating '+ obj.beerUUID + ' and object ' + JSON.stringify(obj))});
             // Update the ratings counts
-            client.updateRatingQuery.run(change, logDBError);
+            client.updateRatingQuery.run(change,
+                function(err) {logDBError(err, '  updateRatingQuery ' + obj.beerUUID + ' and object ' + JSON.stringify(change))});
             // Insert the changes into the journal 
             var counter = journalChanges.length;
             for ( let journalChange of journalChanges ) {
@@ -216,11 +233,11 @@ function addRating( obj, callback ) {
                 // object so it doesn't get a lastID as a result of calling the 
                 // insertJournal query.
                 client.insertJournalQuery.run( journalChange , function(err) {
-                    logDBError(err)
+                    logDBError(err, ' INSERT RUN CALLBACK with ' + obj.beerUUID + ' and object ' + JSON.stringify(obj)) 
                     counter--;
                     // Only trigger callback on last query execution
                     if ( counter === 0 ) {
-                        lastWatermark = this.lastID+1;
+                        lastWatermark = this.lastID;
                         client.commit();
                         dbPool.release(client);
                         callback(lastWatermark);
@@ -228,12 +245,23 @@ function addRating( obj, callback ) {
                 });
             }
         });
-    }); 
+    }, (err) => {
+        // Error in BEGIN TRANSACTION
+        if ( retries < 1 ) {
+            dbPool.release(client);
+            callback(null);
+        } else {
+            console.log('AGAIN');
+            setImmediate(addRatingOnPooledConnection, client, obj, callback, retries-1);
+        }
+    });
 }
 
-function logDBError(err) {
+
+function logDBError(err, text) {
     if (err) {
-        console.log(err);
+        text = text || '';
+        console.log(err + text);
     }
 }
 
