@@ -2,12 +2,12 @@
 var express = require('express');
 var logger = require('morgan');
 var bodyParser = require('body-parser')
-var sqlite3 = require('sqlite3').verbose();
+var sqlite3 = require('sqlite3')
 // Used to access the beer list from the current CBF website. We will ensure that
 // our list of available beers is up-to-date with this list.
 var cbf = require('./cbfAccess.js')
 var dbModule = require('./db.js')
-
+var pkg = require('./package.json')
 
 var app = express();
 app.use( bodyParser.json() );
@@ -83,7 +83,7 @@ app.post( '/post*', function( req, res ) {
 /**
  * Database creation
  */
-var db = new sqlite3.cached.Database('data/info.db');
+var db = new sqlite3.cached.Database(pkg.production.db_location);
 var selectJournalQuery, selectRatingQuery;
 var selectUserBeerRating, selectUserRatings;
 var cbfObject;
@@ -103,12 +103,14 @@ function onDBCreated(err) {
     
     dbPool = dbModule.makeDBPool();
     
+    // Finally get the correct watermark from the DB and start the application 
+    // listening on port 3000.
     db.get('SELECT max(rowid) as lastWatermark FROM journal', function(err, row) {
         if (!err) {
             lastWatermark = row.lastWatermark;
         }
         // Interact with this application on port 3000
-        app.listen(3000);
+        app.listen(pkg.production.port);
     });
 }
 
@@ -140,6 +142,10 @@ var lastWatermark = 0;
 function getRatingsFromWatermark( watermarkFrom, callback ) {
 -   selectJournalQuery.all( {$watermark: watermarkFrom}, 
         function(err, rows) {
+            if (err) {
+                callback(err);
+                return
+            }
             var ratings = new Array(rows.length);
             var beerIDs = new Array(rows.length);
             for ( var i = 0; i < rows.length; i++ ) {
@@ -154,12 +160,20 @@ function getRatingsFromWatermark( watermarkFrom, callback ) {
 function getUserRatings( user, callback ) { 
     selectUserRatings.all( {$user: user}, 
         function(err, rows) {
-            callback( rows );
+            if (err) {
+                callback(err);
+            } else {
+                callback( rows );
+            }
         });
 }
 
 function getAllRatings( callback ) {
     selectRatingQuery.all( function( err, rows ) {
+            if (err) {
+                callback(err);
+                return
+            }
             var ratings = new Array(rows.length);
             var beerUUIDs = new Array(rows.length);
             var names = new Array(rows.length);
@@ -191,6 +205,7 @@ function addRating( obj, callback ) {
 function addRatingOnPooledConnection(client, obj, callback, retries) {
     retries = retries || 5;
     if (retries < 5) console.log('Retries = ' + retries);
+    var beforeExit = function(err) {dbPool.release(client)};
     client.begin().then( (noerror) => {
         // We managed to get a successful lock on the database to update the 
         // ratings so start looking for an existing rating for this user and beer
@@ -203,7 +218,7 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
                 // Giving the same rating again? Simply ignore since nothing needs to
                 // be done.
                 if ( row.rating == obj.rating ) {
-                    client.rollback().then( (err) => {dbPool.release(client)} ); 
+                    client.rollback().then( beforeExit, beforeExit ); 
                     callback(lastWatermark);
                     return;
                 }
@@ -237,7 +252,7 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
                     // Only trigger callback on last query execution
                     if ( counter === 0 ) {
                         lastWatermark = this.lastID;
-                        client.commit().then( (err) => {dbPool.release(client)} );
+                        client.commit().then( beforeExit, beforeExit );
                         callback(lastWatermark);
                     }
                 });
@@ -246,7 +261,7 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
     }, (err) => {
         // Error in BEGIN TRANSACTION
         if ( retries < 1 ) {
-            dbPool.release(client);
+            beforeExit(null);
             callback(null);
         } else {
             console.log('AGAIN');
