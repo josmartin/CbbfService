@@ -1,0 +1,3 @@
+This file exists to ensure that the data directory is created
+so that the raw application can start correctly (since the DB
+is created in this folder)

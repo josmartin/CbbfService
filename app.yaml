@@ -1,0 +1,10 @@
+# Deployment options for node.js in Google App Engine
+runtime: nodejs
+vm: true
+threadsafe: true
+
+skip_files:
+  - ^(.*/)?.*/node_modules/.*$
+
+manual_scaling:
+    instances: 1
