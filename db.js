@@ -3,7 +3,7 @@ module.exports = {
     makeDBPool: makeDBPool,   
 }
 
-var resources = require('./resources.json')
+var pkg = require('./package.json')
 var sqlite3 = require('sqlite3').verbose();
 var Pool = require('generic-pool').Pool;
 var Promise = require('promise');
@@ -26,7 +26,7 @@ class dbConnection {
     constructor() {
         console.log('count: ' + count++);
         this.InUse = false;
-        this.Connection = new sqlite3.Database(resources.db_location);            
+        this.Connection = new sqlite3.Database(pkg.production.db_location);            
         this.insertJournalQuery = this.Connection.prepare("INSERT INTO journal (beerID, rating, time) VALUES ((SELECT rowid FROM beers WHERE beerUUID = $beerUUID), $rating, date('now'))");
         this.updateRatingQuery = this.Connection.prepare('UPDATE beers SET r1=r1+?1, r2=r2+?2, r3=r3+?3, r4=r4+?4, r5=r5+?5 WHERE beerUUID=?6');
         this.selectUserBeerRating  = this.Connection.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');
