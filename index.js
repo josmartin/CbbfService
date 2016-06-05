@@ -1,19 +1,23 @@
-
 "use strict";
 var express = require('express');
 var logger = require('morgan');
 var bodyParser = require('body-parser')
 var sqlite3 = require('sqlite3')
+var cors = require('cors');
+
 // Used to access the beer list from the current CBF website. We will ensure that
 // our list of available beers is up-to-date with this list.
 var cbf = require('./cbfAccess.js')
+// Define our database schema and connection pooling
 var dbModule = require('./db.js')
-var cors = require('cors');
 var pkg = require('./package.json')
 
 var app = express();
 
+// Needed to enabled Cross-Origin Resource Sharing so that web-pages from 
+// bedewell.com can still call the GCE service.
 app.use(cors());
+
 app.use( bodyParser.json() );
 app.use( bodyParser.urlencoded({extended: true}) );
 
@@ -33,14 +37,18 @@ app.use('/static', express.static( __dirname + '/static' ));
 app.get( '/endpoints/beer.service', ( req, res ) => {
         res.send('');
     });
-   
+
+/**
+ * Define all the GET requests first - these are all methods of retrieving 
+ * information from the service.
+ */   
 app.get( '/get/ratings/journal', function( req, res ) {
         var watermarkFrom = req.query.watermark;
         getRatingsFromWatermark(watermarkFrom, function(output) { 
             res.send(output); 
         });
     });
-
+    
 app.get( '/get/ratings/all', function( req, res ) {
         getAllRatings( function(output) { 
             res.send(output) 
@@ -60,8 +68,12 @@ app.post( '/post/newrating', function( req, res ) {
         if  (!( "beerUUID" in body && "rating" in body && "user" in body)) {
             res.send({});
         }
-        addRating(body, function(watermark) {            
-            res.send( { beerUUID:body.beerUUID, rating:body.rating, watermark:watermark });
+        addRating(body, function(err, watermark) {
+            if (err) {
+                res.send(err);
+            } else {
+                res.send( { beerUUID:body.beerUUID, rating:body.rating, watermark:watermark });
+            }
         });
     });
 
@@ -83,21 +95,16 @@ app.post( '/post*', function( req, res ) {
         res.send(req.body);
     });
 
-
-/**
- * Database creation
- */
+// Create shared connection for use in querying the DB
 var db = new sqlite3.cached.Database(pkg.production.db_location);
 var selectJournalQuery, selectRatingQuery;
 var selectUserBeerRating, selectUserRatings;
 var cbfObject;
 var dbPool;
-db.serialize(function() {
-    db.run('CREATE TABLE IF NOT EXISTS beers (beerUUID TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beerUUID) ON CONFLICT IGNORE)');
-    db.run('CREATE TABLE IF NOT EXISTS journal (beerID INTEGER NOT NULL, rating INTEGER NOT NULL, time NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid))');
-    db.run('CREATE TABLE IF NOT EXISTS user_rating (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid), PRIMARY KEY (user, beerID) ON CONFLICT REPLACE)', onDBCreated);
-    
-});
+
+// Make sure that the database is correctly created. On completion we can 
+// prepare some lookup queries, 
+dbModule.createDB(onDBCreated);
 
 function onDBCreated(err) {
     selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid > $watermark');
@@ -111,7 +118,11 @@ function onDBCreated(err) {
     // listening on port 3000.
     db.get('SELECT max(rowid) as lastWatermark FROM journal', function(err, row) {
         if (!err) {
-            lastWatermark = row.lastWatermark;
+            if (row.lastWatermark !== null) {
+                lastWatermark = row.lastWatermark;
+            } else {
+                lastWatermark = 0;
+            }
         }
         // Interact with this application on a production port
         app.listen(pkg.production.port);
@@ -199,7 +210,7 @@ function addRating( obj, callback ) {
      */
     dbPool.acquire( function(err, client) {
         if (err) { 
-            callback(err);
+            callback(err, null);
         } else {
             addRatingOnPooledConnection(client, obj, callback);
         }
@@ -214,6 +225,11 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
         // We managed to get a successful lock on the database to update the 
         // ratings so start looking for an existing rating for this user and beer
         client.selectUserBeerRating.get({$user: obj.user, $beerUUID: obj.beerUUID}, function( err, row ) {
+            if (err) {
+                client.rollback().then( beforeExit, beforeExit );
+                callback(err, null);
+                return
+            }
             // Return from select statement lets us know if this user and beer combination
             // has been rated before. If it has, we need to undo the 
             var change = { 6: obj.beerUUID, 1:0, 2:0, 3:0, 4:0, 5:0 };
@@ -223,52 +239,57 @@ function addRatingOnPooledConnection(client, obj, callback, retries) {
                 // be done.
                 if ( row.rating == obj.rating ) {
                     client.rollback().then( beforeExit, beforeExit ); 
-                    callback(lastWatermark);
+                    callback(null, lastWatermark);
                     return;
                 }
                 // Otherwise, old rating needs to be removed from the journal
                 // and from the ratings count
                 change[row.rating] += -1;
-                journalChanges.push({$beerUUID: obj.beerUUID, $rating:-row.rating});
+                journalChanges.push({$user: obj.user, $beerUUID: obj.beerUUID, $rating:-row.rating});
             }
             // New rating needs to be added to the journal and the ratings count
             change[obj.rating] += 1;
-            journalChanges.push({$beerUUID: obj.beerUUID, $rating:obj.rating});
-            // Replace user beer rating so we know this user has rated this beer
-            client.replaceUserBeerRating.run( 
-                {$user: obj.user, $beerUUID: obj.beerUUID, $rating: obj.rating}, 
-                function(err) {logDBError(err, '  replaceUserBeerRating '+ obj.beerUUID + ' and object ' + JSON.stringify(obj))});
-            // Update the ratings counts
-            client.updateRatingQuery.run(change,
-                function(err) {logDBError(err, '  updateRatingQuery ' + obj.beerUUID + ' and object ' + JSON.stringify(change))});
-            // Insert the changes into the journal 
-            var counter = journalChanges.length;
-            for ( let journalChange of journalChanges ) {
-                // NOTE: This is still part of the db.serialize as forEach on an array
-                // stays within the same javascript execution block. 
-                // ALSO NOTE: It is critical that the callback below be defined as a
-                // function rather than => since the latter will bind in the this 
-                // object so it doesn't get a lastID as a result of calling the 
-                // insertJournal query.
-                client.insertJournalQuery.run( journalChange , function(err) {
-                    logDBError(err, ' journalChange') 
-                    counter--;
-                    // Only trigger callback on last query execution
-                    if ( counter === 0 ) {
-                        lastWatermark = this.lastID;
+            journalChanges.push({$user: obj.user, $beerUUID: obj.beerUUID, $rating:obj.rating});
+            
+            var counter = 0;
+            var firstError = null
+            var afterAllQuerysAreComplete = function(err) {
+                counter--;
+                if (err && firstError === null) {
+                    firstError = err;
+                }
+                if ( counter === 0 ) {
+                    if ( firstError === null ) {
                         client.commit().then( beforeExit, beforeExit );
-                        callback(lastWatermark);
+                        lastWatermark = this.lastID;
+                        callback(null, lastWatermark);
+                    } else {
+                        client.rollback().then( beforeExit, beforeExit ); 
+                        callback(firstError, null);
                     }
-                });
+                }
+            };
+            var getNewQueryCompleteFunction = function() {
+                counter++;
+                return afterAllQuerysAreComplete
+            };
+            // Replace user beer rating so we know this user has rated this beer
+            client.setUserBeerRating.run( 
+                {$user: obj.user, $beerUUID: obj.beerUUID, $rating: obj.rating}, 
+                getNewQueryCompleteFunction());
+            // Update the ratings counts
+            client.updateBeerRatings.run(change, getNewQueryCompleteFunction());
+            // Insert the changes into the journal 
+            for ( let journalChange of journalChanges ) {
+                client.insertJournalEntry.run(journalChange, getNewQueryCompleteFunction());
             }
         });
     }, (err) => {
         // Error in BEGIN TRANSACTION
         if ( retries < 1 ) {
             beforeExit(null);
-            callback(null);
+            callback(err, null);
         } else {
-            console.log('AGAIN');
             setTimeout(addRatingOnPooledConnection, 100, client, obj, callback, retries-1);
         }
     });
