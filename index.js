@@ -1,3 +1,4 @@
+
 "use strict";
 var express = require('express');
 var logger = require('morgan');
@@ -7,9 +8,11 @@ var sqlite3 = require('sqlite3').verbose();
 // our list of available beers is up-to-date with this list.
 var cbf = require('./cbfAccess.js')
 var dbModule = require('./db.js')
-
+var cors = require('cors');
 
 var app = express();
+
+app.use(cors());
 app.use( bodyParser.json() );
 app.use( bodyParser.urlencoded({extended: true}) );
 
@@ -108,7 +111,7 @@ function onDBCreated(err) {
             lastWatermark = row.lastWatermark;
         }
         // Interact with this application on port 3000
-        app.listen(3000);
+        app.listen(8080);
     });
 }
 
