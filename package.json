@@ -29,6 +29,6 @@
   ,"homepage": "https://github.com/josmartin/CbbfService"
   ,"production": {
     "db_location": "data/info.db"
-    ,"port": "3000"
+    ,"port": "8080"
   }
 }

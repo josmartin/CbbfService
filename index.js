@@ -113,7 +113,7 @@ function onDBCreated(err) {
         if (!err) {
             lastWatermark = row.lastWatermark;
         }
-        // Interact with this application on port 3000
+        // Interact with this application on a production port
         app.listen(pkg.production.port);
     });
 }
