@@ -14,6 +14,8 @@ var pkg = require('./package.json')
 
 var app = express();
 
+app.set('trust proxy', true);
+
 // Needed to enabled Cross-Origin Resource Sharing so that web-pages from 
 // bedewell.com can still call the GCE service.
 app.use(cors());
@@ -34,7 +36,7 @@ app.use('/static', express.static( __dirname + '/static' ));
 // To allow development builds of the app to support the bedewell.com endpoint
 // services framework we enable a get on the beer.service. This is ONLY useful 
 // when running in development
-app.get( '/endpoints/beer.service', ( req, res ) => {
+app.get('/endpoints/beer.service', ( req, res ) => {
         res.send('');
     });
 
@@ -42,20 +44,20 @@ app.get( '/endpoints/beer.service', ( req, res ) => {
  * Define all the GET requests first - these are all methods of retrieving 
  * information from the service.
  */   
-app.get( '/get/ratings/journal', function( req, res ) {
+app.get('/get/ratings/journal', function( req, res ) {
         var watermarkFrom = req.query.watermark;
         getRatingsFromWatermark(watermarkFrom, function(output) { 
             res.send(output); 
         });
     });
     
-app.get( '/get/ratings/all', function( req, res ) {
+app.get('/get/ratings/all', function( req, res ) {
         getAllRatings( function(output) { 
             res.send(output) 
         });
     });
 
-app.get( '/get/ratings/user', function( req, res ) {
+app.get('/get/ratings/user', function( req, res ) {
         var user = req.query.user;
         getUserRatings( user, function(output) { 
             res.send(output) 
@@ -63,7 +65,7 @@ app.get( '/get/ratings/user', function( req, res ) {
     });
     
     
-app.post( '/post/newrating', function( req, res ) {
+app.post('/post/newrating', function( req, res ) {
         var body = req.body;
         if  (!( "beerUUID" in body && "rating" in body && "user" in body)) {
             res.send({});
@@ -77,11 +79,17 @@ app.post( '/post/newrating', function( req, res ) {
         });
     });
 
-app.post( '/post/testData', function( req, res ) {
+app.post('/post/testData', function( req, res ) {
         testDatabase();
         res.send(req.body);
     });
 
+// Our application will need to respond to health checks when running on
+// Compute Engine with Managed Instance Groups.
+app.get('/_ah/health', function (req, res) {
+  res.status(200).send('ok');
+});
+    
 // Only log unexpected requests - below the ones above that 
 // we currently expect.
 app.use( logger('combined') );
@@ -161,14 +169,18 @@ function getRatingsFromWatermark( watermarkFrom, callback ) {
                 callback(err);
                 return
             }
-            var ratings = new Array(rows.length);
-            var beerIDs = new Array(rows.length);
-            for ( var i = 0; i < rows.length; i++ ) {
-                var t = rows[i];
-                ratings[i] = t.rating;
-                beerIDs[i] = t.beerID;
+            try {
+                var ratings = new Array(rows.length);
+                var beerIDs = new Array(rows.length);
+                for ( var i = 0; i < rows.length; i++ ) {
+                    var t = rows[i];
+                    ratings[i] = t.rating;
+                    beerIDs[i] = t.beerID;
+                }
+                callback({newWatermark: lastWatermark, journal: {beerIDs:beerIDs, ratings:ratings}});
+            } catch (err) {
+                callback(err);
             }
-            callback({newWatermark: lastWatermark, journal: {beerIDs:beerIDs, ratings:ratings}});
         });
 }
 
@@ -178,7 +190,7 @@ function getUserRatings( user, callback ) {
             if (err) {
                 callback(err);
             } else {
-                callback( rows );
+                callback(rows);
             }
         });
 }
@@ -189,16 +201,20 @@ function getAllRatings( callback ) {
                 callback(err);
                 return
             }
-            var ratings = new Array(rows.length);
-            var beerUUIDs = new Array(rows.length);
-            var names = new Array(rows.length);
-            for ( var i = 0; i < rows.length; i++ ) {
-                var t = rows[i];
-                ratings[i] = [t.r1, t.r2, t.r3, t.r4, t.r5];
-                beerUUIDs[i] = t.beerUUID;
-                names[i] = t.name;
+            try {
+                var ratings = new Array(rows.length);
+                var beerUUIDs = new Array(rows.length);
+                var names = new Array(rows.length);
+                for ( var i = 0; i < rows.length; i++ ) {
+                    var t = rows[i];
+                    ratings[i] = [t.r1, t.r2, t.r3, t.r4, t.r5];
+                    beerUUIDs[i] = t.beerUUID;
+                    names[i] = t.name;
+                }
+                callback( {newWatermark: lastWatermark, beerUUIDs: beerUUIDs, ratings: ratings, names: names} );
+            } catch (err) {
+                callback(err);
             }
-            callback( {newWatermark: lastWatermark, beerUUIDs: beerUUIDs, ratings: ratings, names: names} );
         });
 }
 
@@ -220,7 +236,7 @@ function addRating( obj, callback ) {
 function addRatingOnPooledConnection(client, obj, callback, retries) {
     retries = retries || 5;
     if (retries < 5) console.log('Retries = ' + retries);
-    var beforeExit = function(err) {dbPool.release(client)};
+    var beforeExit = function(arg) {dbPool.release(client)};
     client.begin().then( (noerror) => {
         // We managed to get a successful lock on the database to update the 
         // ratings so start looking for an existing rating for this user and beer

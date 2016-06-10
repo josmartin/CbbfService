@@ -63,7 +63,7 @@ class dbConnection {
                     console.log('BEGIN ERROR ' + err);
                     reject(err);
                 } else {
-                    resolve(self);
+                    resolve(null);
                 }
             });
             self.InUse = true;
@@ -79,7 +79,7 @@ class dbConnection {
                     console.log('COMMIT ERROR ' + err);
                     reject(err);
                 } else {
-                    resolve(resolve);
+                    resolve(null);
                 }
             });
         });
@@ -94,7 +94,7 @@ class dbConnection {
                     console.log('ROLLBACK ERROR ' + err);
                     reject(err);
                 } else {
-                    resolve(self);
+                    resolve(null);
                 }
             });
         });
