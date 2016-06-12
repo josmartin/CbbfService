@@ -12,7 +12,7 @@ module.exports = {
     dbFilename: pkg[env].db_filename,
     gae: {
         inCloudShell: 'DEVSHELL_PROJECT_ID' in process.env,
-        inGAE: 'GAE_LONG_APP_ID' in process.env || 'IN_GAE' in process.env,
+        inGAE: 'GAE_LONG_APP_ID' in process.env || 'IN_GAE' in process.env || 'DEVSHELL_PROJECT_ID' in process.env,
     },
     gcloud: {
         projectID: getProjectID(),

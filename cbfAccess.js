@@ -78,7 +78,7 @@ function getDatabaseFromGcloud() {
 function getGcloudBucket() {
     var storageOptions = {projectId: config.gcloud.projectID};
 
-    if ( !(config.gae.inCloudShell || config.gae.inGAE) ) {
+    if ( !config.gae.inGAE ) {
         console.log(config);
         storageOptions.keyFilename = resources.gcloud.gcloudKeyFile
     } 
