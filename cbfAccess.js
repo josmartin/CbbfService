@@ -79,7 +79,6 @@ function getGcloudBucket() {
     var storageOptions = {projectId: config.gcloud.projectID};
 
     if ( !config.gae.inGAE ) {
-        console.log(config);
         storageOptions.keyFilename = resources.gcloud.gcloudKeyFile
     } 
     var gcs = gcloud.storage(storageOptions);
