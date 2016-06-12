@@ -47,7 +47,6 @@ class dbConnection {
     }
 
     close() {
-        console.log('ABOUT TO CLOSE')
         this.insertJournalEntry.finalize((err) => {if (err) console.log('CLOSE ' + err)});
         this.updateBeerRatings.finalize((err) => {if (err) console.log('CLOSE ' + err)});
         this.selectUserBeerRating.finalize((err) => {if (err) console.log('CLOSE ' + err)});
