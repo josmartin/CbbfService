@@ -4,10 +4,11 @@ module.exports = {
     createDB: createDB
 }
 
-var pkg = require('./package.json')
 var sqlite3 = require('sqlite3');
 var Pool = require('generic-pool').Pool;
 var Promise = require('promise');
+var cbf = require('./cbfAccess.js');
+var pkg = require('./package.json')
 
 function makeDBPool() {
     return new Pool({
@@ -22,12 +23,14 @@ function makeDBPool() {
 }
 
 function createDB(callback) {
-    var connection = new sqlite3.Database(pkg.production.db_location);
-    connection.serialize(function() {
-        connection.run('CREATE TABLE IF NOT EXISTS beers (beerUUID TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beerUUID) ON CONFLICT IGNORE)');
-        connection.run('CREATE TABLE IF NOT EXISTS journal (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, time NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid))');
-        connection.run('CREATE TABLE IF NOT EXISTS user_rating (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid), PRIMARY KEY (user, beerID) ON CONFLICT REPLACE)', callback);        
-    });    
+    cbf.getDatabaseFromGcloud().then( function(fileExists) {
+        var connection = new sqlite3.Database(pkg.production.db_location);
+        connection.serialize(function() {
+            connection.run('CREATE TABLE IF NOT EXISTS beers (beerUUID TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beerUUID) ON CONFLICT IGNORE)');
+            connection.run('CREATE TABLE IF NOT EXISTS journal (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, time NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid))');
+            connection.run('CREATE TABLE IF NOT EXISTS user_rating (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid), PRIMARY KEY (user, beerID) ON CONFLICT REPLACE)', callback);        
+        });
+    });
 }
 
 class dbConnection {

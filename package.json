@@ -1,34 +1,36 @@
 {
-  "name": "CbbfService"
-  ,"version": "0.0.1"
-  ,"description": ""
-  ,"main": "index.js"
-  ,"dependencies": {
-    "body-parser": "^1.8.1"
-    ,"express": "^4.9.0"
-    ,"morgan": "^1.3.0"
-    ,"sqlite3": "^3.0.0"
-    ,"generic-pool": "^2.4.2"
-    ,"promise": "^7.1.1"
-    ,"cors": "^2.7.1"  
-  }
-  ,"devDependencies": {}
-  ,"scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-    ,"start": "node index.js"
-  }
-  ,"repository": {
-    "type": "git"
-    ,"url": "https://github.com/josmartin/CbbfService.git"
-  }
-  ,"author": "Jos Martin"
-  ,"license": "BSD"
-  ,"bugs": {
+  "name": "CbbfService",
+  "version": "0.0.1",
+  "description": "Cambridge Beer Festival Web Service",
+  "main": "index.js",
+  "dependencies": {
+    "body-parser": "^1.8.1",
+    "cors": "^2.7.1",
+    "express": "^4.9.0",
+    "fast-crc32c": "^1.0.2",
+    "gcloud": "^0.36.0",
+    "generic-pool": "^2.4.2",
+    "morgan": "^1.3.0",
+    "promise": "^7.1.1",
+    "sqlite3": "^3.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/josmartin/CbbfService.git"
+  },
+  "author": "Jos Martin",
+  "license": "BSD",
+  "bugs": {
     "url": "https://github.com/josmartin/CbbfService/issues"
-  }
-  ,"homepage": "https://github.com/josmartin/CbbfService"
-  ,"production": {
-    "db_location": "data/info.db"
-    ,"port": "8080"
+  },
+  "homepage": "https://github.com/josmartin/CbbfService",
+  "production": {
+    "db_location": "data/info.db",
+    "port": "8080"
   }
 }

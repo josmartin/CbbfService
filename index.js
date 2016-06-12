@@ -4,6 +4,7 @@ var logger = require('morgan');
 var bodyParser = require('body-parser')
 var sqlite3 = require('sqlite3')
 var cors = require('cors');
+var Promise = require('promise');
 
 // Used to access the beer list from the current CBF website. We will ensure that
 // our list of available beers is up-to-date with this list.
@@ -84,6 +85,12 @@ app.post('/post/testData', function( req, res ) {
         res.send(req.body);
     });
 
+app.post('/post/uploadDatabase', function( req, res ) {
+    cbf.uploadDatabaseToGcloud().then( 
+        (OK) => {res.send({result:'OK'});},
+        (err) => {res.send(err)});        
+    });
+    
 // Our application will need to respond to health checks when running on
 // Compute Engine with Managed Instance Groups.
 app.get('/_ah/health', function (req, res) {
@@ -104,17 +111,19 @@ app.post( '/post*', function( req, res ) {
     });
 
 // Create shared connection for use in querying the DB
-var db = new sqlite3.cached.Database(pkg.production.db_location);
+var db;
 var selectJournalQuery, selectRatingQuery;
 var selectUserBeerRating, selectUserRatings;
 var cbfObject;
 var dbPool;
+var dbSaveInterval;
 
 // Make sure that the database is correctly created. On completion we can 
 // prepare some lookup queries, 
 dbModule.createDB(onDBCreated);
 
 function onDBCreated(err) {
+    db = new sqlite3.cached.Database(pkg.production.db_location);
     selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid > $watermark');
     selectRatingQuery = db.prepare('SELECT * from beers');
     selectUserBeerRating  = db.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');
@@ -124,29 +133,48 @@ function onDBCreated(err) {
     
     // Finally get the correct watermark from the DB and start the application 
     // listening on port 3000.
-    db.get('SELECT max(rowid) as lastWatermark FROM journal', function(err, row) {
-        if (!err) {
-            if (row.lastWatermark !== null) {
-                lastWatermark = row.lastWatermark;
+    var p1 = getLatestWatermarkFromDB().then( (val) => {
+        lastWatermark = val;
+    });
+    var p2 = cbf.getBeerDataFromCBF().then(
+        (obj) => {
+            cbfObject = obj;
+            console.log('Loaded beer data from CBF website');
+            ensureAllBeersExistInRatingsTable( cbfObject.producers )
+        }, 
+        (error) => {
+            consol.log(`Got error from CBF Server: ${error.message}`);
+        });
+    Promise.all([p1, p2]).then( 
+        (OK) => {
+            console.log('Starting listening on port ' + pkg.production.port);
+            // Interact with this application on a production port
+            app.listen(pkg.production.port);
+            dbSaveInterval = setInterval(saveDatabaseToGcloud, pkg.production.db_saveInterval);
+        },
+        (error) => {
+        });
+}
+
+function getLatestWatermarkFromDB() {
+    return new Promise( function( resolve, reject ) {
+        db.get('SELECT max(rowid) as lastWatermark FROM journal', function(err, row) {
+            if (err) {
+                reject(err);
             } else {
-                lastWatermark = 0;
-            }
-        }
-        // Interact with this application on a production port
-        app.listen(pkg.production.port);
+                if (row.lastWatermark !== null) {
+                    resolve(row.lastWatermark);
+                } else {
+                    resolve(0);
+                }
+            }        
+        });
     });
 }
 
-cbf.getBeerDataFromCBF( 
-    (obj) => {
-        cbfObject = obj;
-        console.log('Loaded beer data from CBF website');
-        ensureAllBeersExistInRatingsTable( cbfObject.producers )
-    }, 
-    (error) => {
-        consol.log(`Got error from CBF Server: ${error.message}`);
-    });
-
+function saveDatabaseToGcloud() {
+    cbf.uploadDatabaseToGcloud();
+}
     
 function ensureAllBeersExistInRatingsTable( producers ) {
     var stmt = db.prepare('INSERT INTO beers VALUES ($beerUUID, $name, $brewery, 0, 0, 0, 0, 0)');

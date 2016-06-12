@@ -12,6 +12,7 @@ Watermark:	<input id="WATERMARK" 	type="text" value="0"><br>
 <button type="button" onclick="doNewRating()">POST RATING</button>
 <button type="button" onclick="doGetUserRatings()">USER RATINGS</button>
 <button type="button" onclick="doTest()">TEST</button>
+<button type="button" onclick="uploadDB()">UPLOAD DB</button>
 </form>
 
 
@@ -90,6 +91,13 @@ function doTestDatabase() {
 	function(d) { console.log(d); }, 
 	'json');
 
+}
+
+function uploadDB() {
+	$.post(beerURI + '/post/uploadDatabase',
+	{},
+	function(d) { console.log(d); }, 
+	'json');
 }
 
 function doNewRating() {
