@@ -31,6 +31,7 @@
   "homepage": "https://github.com/josmartin/CbbfService",
   "production": {
     "db_location": "data/info.db",
-    "port": "8080"
+    "port": "8080",
+    "db_saveInterval": "3600000"
   }
 }
