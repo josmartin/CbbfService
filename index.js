@@ -15,7 +15,14 @@ var pkg = require('./package.json')
 
 var app = express();
 
+// Provided by https://cloud.google.com/appengine/docs/flexible/nodejs/runtime#https_and_forwarding_proxies
 app.set('trust proxy', true);
+app.use(function (req, res, next) {
+  if (req.get('x-appengine-https') === 'on' && !req.get('x-forwarded-proto')) {
+    req.headers['x-forwarded-proto'] = 'https';
+  }
+  next();
+});
 
 // Needed to enabled Cross-Origin Resource Sharing so that web-pages from 
 // bedewell.com can still call the GCE service.

@@ -5,6 +5,10 @@ threadsafe: true
 
 skip_files:
   - ^(.*/)?.*/node_modules/.*$
+  - ^(.*/)?data/info.db$
 
 manual_scaling:
     instances: 1
+
+env_variables:
+  IN_GAE: 'true'
