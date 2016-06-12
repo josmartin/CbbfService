@@ -30,17 +30,17 @@
   },
   "homepage": "https://github.com/josmartin/CbbfService",
   "production": {
-    "db_location": "data/info.db",
+    "db_filename": "info.db",
     "port": "8080",
     "db_saveInterval": "3600000"
   },
   "development": {
-    "db_location": "data/info_dev.db",
+    "db_filename": "info_dev.db",
     "port": "8080",
     "db_saveInterval": "120000"
   },
   "stageing": {
-    "db_location": "data/info_stage.db",
+    "db_filename": "info_stage.db",
     "port": "8080",
     "db_saveInterval": "120000"
   }  

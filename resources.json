@@ -1,9 +1,10 @@
 {
     "cbfJSONurlREAL":"http://www.cambridgebeerfestival.com/cbf/43/beer/json"
     ,"cbfJSONurl":"http://services.bedewell.com/endpoints/cbf43.json"
-    ,"gcloud":{
+    ,"dataFolder": "data"
+    ,"gcloud": {
         "projectID":"round-core-132923"
         ,"cbbfBucket":"cbbf-data"
-        ,"databaseFilename":"info.db"
+        ,"gcloudKeyFile":"gcloudkeyfile.json"
     }
 }

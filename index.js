@@ -75,7 +75,7 @@ app.get('/get/ratings/user', function( req, res ) {
     
 app.post('/post/newrating', function( req, res ) {
         var body = req.body;
-        if  (!( "beerUUID" in body && "rating" in body && "user" in body)) {
+        if  (!( 'beerUUID' in body && 'rating' in body && 'user' in body)) {
             res.send({});
         }
         addRating(body, function(err, watermark) {
@@ -93,7 +93,7 @@ app.post('/post/testData', function( req, res ) {
     });
 
 app.post('/post/uploadDatabase', function( req, res ) {
-    cbf.uploadDatabaseToGcloud().then( 
+    saveDatabaseToGcloud().then( 
         (OK) => {res.send({result:'OK'});},
         (err) => {res.send(err)});        
     });
@@ -102,6 +102,14 @@ app.post('/post/uploadDatabase', function( req, res ) {
 // Compute Engine with Managed Instance Groups.
 app.get('/_ah/health', function (req, res) {
   res.status(200).send('ok');
+});
+
+app.get('/_ah/stop', function (req, res) {
+    saveDatabaseToGcloud().then( 
+        (OK) => {res.send({result:'OK'})}
+    ).catch(        
+        (err) => {res.send(err)}
+    );
 });
     
 // Only log unexpected requests - below the ones above that 
@@ -150,7 +158,7 @@ function onDBCreated(err) {
             ensureAllBeersExistInRatingsTable( cbfObject.producers )
         }, 
         (error) => {
-            consol.log(`Got error from CBF Server: ${error.message}`);
+            console.log(`Got error from CBF Server: ${error.message}`);
         });
     Promise.all([p1, p2]).then( 
         (OK) => {
@@ -161,7 +169,7 @@ function onDBCreated(err) {
             dbSaveInterval = setInterval(saveDatabaseToGcloud, config.dbSaveInterval);
     }).catch( 
         (error) => {
-            console.log('UNABLE TO START APP');
+            console.log('UNABLE TO START APP: ' + error);
         });
 }
 
@@ -182,7 +190,8 @@ function getLatestWatermarkFromDB() {
 }
 
 function saveDatabaseToGcloud() {
-    cbf.uploadDatabaseToGcloud();
+    console.log('Uploading ' + config.dbFilename + ' to gcloud');
+    return cbf.uploadDatabaseToGcloud();
 }
     
 function ensureAllBeersExistInRatingsTable( producers ) {
