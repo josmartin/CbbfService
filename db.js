@@ -8,7 +8,7 @@ var sqlite3 = require('sqlite3');
 var Pool = require('generic-pool').Pool;
 var Promise = require('promise');
 var cbf = require('./cbfAccess.js');
-var pkg = require('./package.json')
+var config = require('./config.js')
 
 function makeDBPool() {
     return new Pool({
@@ -24,7 +24,7 @@ function makeDBPool() {
 
 function createDB(callback) {
     cbf.getDatabaseFromGcloud().then( function(fileExists) {
-        var connection = new sqlite3.Database(pkg.production.db_location);
+        var connection = new sqlite3.Database(config.dbLocation);
         connection.serialize(function() {
             connection.run('CREATE TABLE IF NOT EXISTS beers (beerUUID TEXT UNIQUE NOT NULL, name, brewery, r1, r2, r3, r4, r5, PRIMARY KEY (beerUUID) ON CONFLICT IGNORE)');
             connection.run('CREATE TABLE IF NOT EXISTS journal (user INTEGER NOT NULL, beerID INTEGER NOT NULL, rating INTEGER NOT NULL, time NOT NULL, FOREIGN KEY(beerID) REFERENCES beers(rowid))');
@@ -36,7 +36,7 @@ function createDB(callback) {
 class dbConnection {
     constructor() {
         this.InUse = false;
-        this.Connection = new sqlite3.Database(pkg.production.db_location);            
+        this.Connection = new sqlite3.Database(config.dbLocation);            
         this.insertJournalEntry = this.Connection.prepare("INSERT INTO journal (user, beerID, rating, time) VALUES ($user, (SELECT rowid FROM beers WHERE beerUUID = $beerUUID), $rating, date('now'))");
         this.updateBeerRatings = this.Connection.prepare('UPDATE beers SET r1=r1+?1, r2=r2+?2, r3=r3+?3, r4=r4+?4, r5=r5+?5 WHERE beerUUID=?6');
         this.selectUserBeerRating  = this.Connection.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');

@@ -1,17 +1,17 @@
 "use strict";
 var express = require('express');
 var logger = require('morgan');
-var bodyParser = require('body-parser')
-var sqlite3 = require('sqlite3')
+var bodyParser = require('body-parser');
+var sqlite3 = require('sqlite3');
 var cors = require('cors');
 var Promise = require('promise');
 
 // Used to access the beer list from the current CBF website. We will ensure that
 // our list of available beers is up-to-date with this list.
-var cbf = require('./cbfAccess.js')
+var cbf = require('./cbfAccess.js');
 // Define our database schema and connection pooling
-var dbModule = require('./db.js')
-var pkg = require('./package.json')
+var dbModule = require('./db.js');
+var config = require('./config.js');
 
 var app = express();
 
@@ -130,7 +130,7 @@ var dbSaveInterval;
 dbModule.createDB(onDBCreated);
 
 function onDBCreated(err) {
-    db = new sqlite3.cached.Database(pkg.production.db_location);
+    db = new sqlite3.cached.Database(config.dbLocation);
     selectJournalQuery = db.prepare('SELECT beerID, rating FROM journal WHERE rowid > $watermark');
     selectRatingQuery = db.prepare('SELECT * from beers');
     selectUserBeerRating  = db.prepare('SELECT rating from user_rating JOIN beers ON beerID = beers.rowid WHERE user = $user AND beerUUID = $beerUUID');
@@ -142,7 +142,7 @@ function onDBCreated(err) {
     // listening on port 3000.
     var p1 = getLatestWatermarkFromDB().then( (val) => {
         lastWatermark = val;
-    });
+    }).catch( (err) => {});
     var p2 = cbf.getBeerDataFromCBF().then(
         (obj) => {
             cbfObject = obj;
@@ -154,12 +154,14 @@ function onDBCreated(err) {
         });
     Promise.all([p1, p2]).then( 
         (OK) => {
-            console.log('Starting listening on port ' + pkg.production.port);
             // Interact with this application on a production port
-            app.listen(pkg.production.port);
-            dbSaveInterval = setInterval(saveDatabaseToGcloud, pkg.production.db_saveInterval);
-        },
+            app.listen(config.port, (err) => {            
+                console.log('Started listening on port ' + config.port)
+            });
+            dbSaveInterval = setInterval(saveDatabaseToGcloud, config.dbSaveInterval);
+    }).catch( 
         (error) => {
+            console.log('UNABLE TO START APP');
         });
 }
 

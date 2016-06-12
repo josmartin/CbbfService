@@ -10,7 +10,7 @@ var http = require('http');
 var Promise = require('promise');
 var gcloud = require('gcloud');
 var resources = require('./resources.json');
-var pkg = require('./package.json')
+var config = require('./config.js');
 
 /**
 * This function queries the CBBF website to get the current list of beers 
@@ -42,7 +42,7 @@ function getBeerDataFromCBF( onBeerDataReceived, onError ) {
 
 function getDatabaseFromGcloud() {
     return new Promise( function( resolve, reject ) {
-        fs.stat( pkg.production.db_location, (err, stats) => {
+        fs.stat( config.dbLocation, (err, stats) => {
             if (!(err && err.code === 'ENOENT')) {
                 console.log('Local DB file exists');
                 resolve(true);
@@ -57,7 +57,7 @@ function getDatabaseFromGcloud() {
                     console.log('Cloud DB file exists: ' + fileExists);
                     if (fileExists) {
                         file.download({
-                            destination: pkg.production.db_location
+                            destination: config.dbLocation
                         }, function(err) {
                             if (err) {
                                 reject(err);
@@ -85,7 +85,7 @@ function getGcloudBucket() {
 
 function uploadDatabaseToGcloud() {
     return new Promise( function( resolve, reject ) {
-        getGcloudBucket().upload(pkg.production.db_location, function(err, file, apiResponse) {
+        getGcloudBucket().upload(config.dbLocation, function(err, file, apiResponse) {
             if (err) {
                 reject(err);
             } else {
